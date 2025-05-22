@@ -6,6 +6,7 @@ import axios from 'axios';
 import TodoCard from '@/components/todoCard';
 import NewTodoCard from '@/components/newTodoCard';
 import NewTodoForm from '@/components/newTodoForm';
+import LoadingOverlay from '@/components/LoadingOverlay.jsx';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 
@@ -14,12 +15,17 @@ const Home = () => {
     const [Todos, setTodos] = useState([]);
     const [showForm, setShowForm] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [loading, setLoading] = useState(false);
+
 
     const navigate = useNavigate();
 
     useEffect(() => {
         const fetchTodos = async () => {
             if (!session?.access_token) return;
+
+            setLoading(true); // ✅ Show loading screen on first load
+
             try {
                 const response = await axios.get(`${BACKEND_URL}/`, {
                     headers: { Authorization: `Bearer ${session.access_token}` },
@@ -27,41 +33,51 @@ const Home = () => {
                 setTodos(response.data);
             } catch (error) {
                 console.error('Error fetching todos:', error);
+            } finally {
+                setLoading(false); // ✅ Hide it once done
             }
         };
+
         fetchTodos();
     }, [user]);
 
+
     const handleLogout = async () => {
+        setLoading(true);
         try {
             await signOut();
             navigate('/auth');
         } catch (error) {
             console.error('Error signing out:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleCreateTodo = async (newTodo) => {
+        setLoading(true);
         try {
             const response = await axios.post(`${BACKEND_URL}/`, newTodo, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
             });
 
-            const createdTodo = response.data; // now guaranteed to be a single todo object
-            console.log('Created todo:', createdTodo);
-
-            if (createdTodo && createdTodo.id) {
+            const createdTodo = response.data;
+            if (createdTodo?.id) {
                 setTodos((prev) => [...prev, createdTodo]);
                 setShowForm(false);
-            } else {
-                console.warn('Received malformed todo:', createdTodo);
             }
         } catch (error) {
             console.error('Error creating todo:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleDeleteTodo = async (id) => {
+        const confirmed = window.confirm("🗑️ Are you sure you want to delete this todo?");
+        if (!confirmed) return;
+
+        setLoading(true);
         try {
             await axios.delete(`${BACKEND_URL}/${id}`, {
                 headers: { Authorization: `Bearer ${session.access_token}` },
@@ -69,17 +85,27 @@ const Home = () => {
             setTodos((prev) => prev.filter((todo) => todo.id !== id));
         } catch (error) {
             console.error('Error deleting todo:', error);
+            alert('❌ Failed to delete todo. Please try again.');
+        } finally {
+            setLoading(false);
         }
-    }
-
+    };
 
     const GenerateSummeryOfPendingTodos = async () => {
         if (!session?.access_token) return;
 
+        setLoading(true);
         setIsGenerating(true);
 
         try {
-            const cleanedTodos = Todos.map(({ task, is_completed, priority }) => ({ task, is_completed, priority }));
+            const cleanedTodos = Todos
+                .filter(todo => todo && typeof todo === 'object') // extra safety
+                .map(({ task, is_completed, priority }) => ({ task, is_completed, priority }));
+
+            if (cleanedTodos.length === 0) {
+                alert("⚠️ No todos found. Please add some todos before generating a summary.");
+                return;
+            }
 
             const response = await axios.post(
                 `${BACKEND_URL}/summarize`,
@@ -97,6 +123,7 @@ const Home = () => {
             alert('❌ Failed to generate and send summary.\n\n' + (error.response?.data?.error || error.message));
         } finally {
             setIsGenerating(false);
+            setLoading(false);
         }
     };
 
@@ -107,26 +134,26 @@ const Home = () => {
             `Are you sure you want to mark this task as ${newStatus ? 'completed' : 'incomplete'}?`
         );
         if (!confirmed) return;
-    
+
         try {
             const token = session?.access_token;
             if (!token) throw new Error("User not authenticated");
-    
+
             // Toggle is_completed
             const payload = {
                 is_completed: newStatus,
             };
-    
+
             const res = await axios.patch(`${BACKEND_URL}/${id}/status`, payload, {
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`,
                 },
             });
-    
+
             const updated = res.data;
             console.log('Updated successfully:', updated);
-    
+
             setTodos(prev =>
                 prev.map(todo => (todo.id === id ? { ...todo, is_completed: newStatus } : todo))
             );
@@ -135,7 +162,7 @@ const Home = () => {
             alert('Something went wrong while updating the todo.');
         }
     };
-    
+
 
 
     return (
@@ -186,6 +213,7 @@ const Home = () => {
 
                 </div>
             </main>
+            {loading && <LoadingOverlay />}
         </div>
     );
 };
