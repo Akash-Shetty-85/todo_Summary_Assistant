@@ -53,6 +53,7 @@ Create .env file in server folder with:
 
 ```bash
 OPENAI_API_KEY=your_openai_api_key
+COHERE_API_KEY=your_chohere_api_key
 SLACK_WEBHOOK_URL=your_slack_webhook_url
 SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
@@ -91,10 +92,10 @@ npm run dev
 
 **LLM Integration (OpenAI)**
 
- - The backend calls OpenAI's API to summarize the list of pending
+ - The backend calls OpenAI's /COHERE  API to summarize the list of pending
    to-dos.
    
-  - Ensure your OpenAI API key is added to .env.
+  - Ensure your OpenAI and COHERE API key is added to .env.
 
 **Slack Integration**
 
