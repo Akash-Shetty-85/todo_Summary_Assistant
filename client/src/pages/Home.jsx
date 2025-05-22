@@ -101,6 +101,43 @@ const Home = () => {
     };
 
 
+    const handelEditTodo = async (id, currentTodo) => {
+        const newStatus = !currentTodo.is_completed;
+        const confirmed = window.confirm(
+            `Are you sure you want to mark this task as ${newStatus ? 'completed' : 'incomplete'}?`
+        );
+        if (!confirmed) return;
+    
+        try {
+            const token = session?.access_token;
+            if (!token) throw new Error("User not authenticated");
+    
+            // Toggle is_completed
+            const payload = {
+                is_completed: newStatus,
+            };
+    
+            const res = await axios.patch(`${BACKEND_URL}/${id}/status`, payload, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+    
+            const updated = res.data;
+            console.log('Updated successfully:', updated);
+    
+            setTodos(prev =>
+                prev.map(todo => (todo.id === id ? { ...todo, is_completed: newStatus } : todo))
+            );
+        } catch (error) {
+            console.error('Error updating todo:', error.response?.data || error.message);
+            alert('Something went wrong while updating the todo.');
+        }
+    };
+    
+
+
     return (
         <div>
             <nav className="flex justify-end p-3 items-center gap-5">
@@ -139,6 +176,10 @@ const Home = () => {
                                 key={todo.id}
                                 todo={todo}
                                 onDelete={() => handleDeleteTodo(todo.id)}
+                                onUpdate={() => {
+                                    // Handle update logic here if needed
+                                    handelEditTodo(todo.id, todo);
+                                }}
                             />
                         )
                     ))}

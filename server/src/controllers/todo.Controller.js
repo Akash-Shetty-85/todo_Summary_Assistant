@@ -85,3 +85,53 @@ export const summarizeAndSend = async (req, res) => {
         return res.status(500).json({ error: error.message });
     }
 };
+
+export const updateTodoStatus = async (req, res) => {
+    const { id } = req.params;
+    const { is_completed } = req.body;
+    const userId = req.user.id;
+
+    // console.log(`Updating todo with ID: ${id} for user: ${userId}`);
+
+    if (typeof is_completed !== 'boolean') {
+        return res.status(400).json({ error: 'is_completed must be a boolean' });
+    }
+
+    // Check if the todo exists and belongs to the user
+    const { data: todo, error: fetchError } = await supabase
+        .from('todos')
+        .select('user_id')
+        .eq('id', id)
+        .single();
+
+    if (fetchError || !todo) {
+        return res.status(404).json({ error: 'Todo not found or access denied' });
+    }
+
+    if (todo.user_id !== userId) {
+        return res.status(403).json({ error: 'Not allowed to update this todo' });
+    }
+
+    // Update is_completed status
+    const { error: updateError } = await supabase
+        .from('todos')
+        .update({ is_completed })
+        .eq('id', id);
+
+    if (updateError) {
+        return res.status(500).json({ error: 'Failed to update todo status' });
+    }
+
+    // Return the updated todo
+    const { data: updatedTodo, error: fetchUpdatedError } = await supabase
+        .from('todos')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+    if (fetchUpdatedError) {
+        return res.status(500).json({ error: 'Failed to fetch updated todo' });
+    }
+
+    res.json(updatedTodo);
+};
